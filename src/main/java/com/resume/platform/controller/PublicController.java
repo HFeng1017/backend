@@ -6,6 +6,7 @@ import com.resume.platform.entity.User;
 import com.resume.platform.service.ResumeService;
 import com.resume.platform.service.SystemConfigService;
 import com.resume.platform.service.UserService;
+import com.resume.platform.utils.RsaUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,7 @@ public class PublicController {
     private final ResumeService resumeService;
     private final UserService userService;
     private final SystemConfigService systemConfigService;
+    private final RsaUtil rsaUtil;
 
     /**
      * 轮播图数组长度
@@ -98,5 +100,18 @@ public class PublicController {
     public Result<Resume> getPublicResume(@PathVariable Long userId) {
         Resume resume = resumeService.getResumeByUserId(userId);
         return Result.success(resume);
+    }
+
+    /**
+     * 获取 RSA 公钥（PEM格式）
+     * 前端登录前调用，用于对用户输入的密码进行公钥加密
+     */
+    @GetMapping("/public-key")
+    public Result<Map<String, String>> getRsaPublicKey() {
+        String publicKeyPem = rsaUtil.getPublicKeyPem();
+        Map<String, String> data = new HashMap<>(4);
+        data.put("publicKey", publicKeyPem);
+        log.debug("下发RSA公钥: pem长度={}", publicKeyPem.length());
+        return Result.success(data);
     }
 }

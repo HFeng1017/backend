@@ -27,9 +27,9 @@ public class LoginDTO implements Serializable {
     private String username;
 
     /**
-     * 登录密码（明文）
+     * 登录密码（前端使用RSA公钥加密后的Base64密文；RSA-2048密文长度为344字符）
      */
     @NotBlank(message = "密码不能为空")
-    @Size(min = 6, max = 100, message = "密码长度必须在 6-100 个字符之间")
+    @Size(min = 6, max = 1024, message = "密码长度必须在 6-1024 个字符之间")
     private String password;
 }

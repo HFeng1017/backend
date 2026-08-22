@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.0</version>
+        <version>3.4.2</version>
         <relativePath/>
     </parent>
 
@@ -18,13 +18,15 @@
     <description>Resume Management Platform Backend</description>
 
     <properties>
+        <!-- 编译目标 JDK 21（Spring Boot 3.x 官方LTS，与 JDK 21/25 都兼容） -->
         <java.version>21</java.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
-        <maven.compiler.compilerVersion>21</maven.compiler.compilerVersion>
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
         <jwt.version>0.11.5</jwt.version>
         <hutool.version>5.8.32</hutool.version>
+        <!-- JDK 25 需要 lombok 1.18.40+；1.18.42 同时兼容 JDK 21/25 -->
+        <lombok.version>1.18.42</lombok.version>
     </properties>
 
     <dependencies>
@@ -94,6 +96,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
             <optional>true</optional>
         </dependency>
 
@@ -109,13 +112,20 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.12.1</version>
+                <version>3.13.0</version>
                 <configuration>
                     <source>21</source>
                     <target>21</target>
                     <compilerArgs>
                         <arg>-parameters</arg>
                     </compilerArgs>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>

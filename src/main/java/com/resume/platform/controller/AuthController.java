@@ -1,9 +1,12 @@
 package com.resume.platform.controller;
 
+import com.resume.platform.common.BusinessException;
+import com.resume.platform.common.ErrorCode;
 import com.resume.platform.common.Result;
 import com.resume.platform.dto.*;
 import com.resume.platform.entity.User;
 import com.resume.platform.service.UserService;
+import com.resume.platform.utils.RsaUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +29,7 @@ import java.util.Map;
 public class AuthController {
 
     private final UserService userService;
+    private final RsaUtil rsaUtil;
 
     /**
      * 登录结果Map初始容量：userId/username/role/accessToken/refreshToken 约5个
@@ -39,14 +43,33 @@ public class AuthController {
 
     /**
      * 用户登录接口
+     * 密码传输约定：前端使用 /api/public/public-key 下发的RSA公钥对明文密码加密（Base64输出），
+     * 后端此处先用RSA私钥解密密文，再进行BCrypt哈希比对。
      *
-     * @param dto 登录请求体（username/password）
+     * @param dto 登录请求体（username：用户名；password：RSA公钥加密后的Base64密文）
      * @return 登录结果，含tokens + 用户基本信息
      */
     @PostMapping("/login")
     public Result<Map<String, Object>> login(@Valid @RequestBody LoginDTO dto) {
-        log.info("收到登录请求: username={}", dto.getUsername());
-        Map<String, String> tokens = userService.login(dto.getUsername(), dto.getPassword());
+        log.info("收到登录请求: username={}, 密码密文长度={}", dto.getUsername(),
+                dto.getPassword() == null ? 0 : dto.getPassword().length());
+
+        // 1. 使用私钥解密 RSA 密文得到明文密码
+        String rawPassword = rsaUtil.decryptPassword(dto.getPassword());
+        if (rawPassword == null) {
+            // 兼容明文（开发/测试兜底，防止前端未及时更新导致登录死锁）
+            rawPassword = dto.getPassword();
+            log.debug("RSA解密为空，回退使用原始password作为明文（前端可能未加密）");
+        }
+
+        // 2. 卫语句：解密后密码不能为空
+        if (rawPassword == null || rawPassword.isEmpty()) {
+            log.warn("登录失败 - 密码解密后为空: username={}", dto.getUsername());
+            throw new BusinessException(ErrorCode.LOGIN_FAILED);
+        }
+
+        // 3. 进行登录业务校验（用户名 + 明文密码 BCrypt 比对）
+        Map<String, String> tokens = userService.login(dto.getUsername(), rawPassword);
         User user = userService.getUserByUsername(dto.getUsername());
         Map<String, Object> result = new HashMap<>(LOGIN_RESULT_CAPACITY);
         result.putAll(tokens);
