@@ -84,6 +84,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/system/config/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // AI对话接口：需要登录认证（JWT）
+                .requestMatchers("/api/chat/**").authenticated()
                 .requestMatchers("/api/project/upload").authenticated()
                 .requestMatchers("/api/project/download/**").authenticated()
                 .requestMatchers("/api/project/preview/**").permitAll()
