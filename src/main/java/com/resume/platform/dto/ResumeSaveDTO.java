@@ -40,7 +40,7 @@ public class ResumeSaveDTO implements Serializable {
     /**
      * 头像图片URL
      */
-    @Size(max = 255, message = "头像 URL 长度不能超过 255 个字符")
+    @Size(max = 500, message = "头像 URL 长度不能超过 500 个字符")
     private String avatar;
 
     /**

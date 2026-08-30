@@ -84,11 +84,17 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/system/config/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // 简历详情（按userId查询）：公开只读，游客模式也能直接访问
+                .requestMatchers(HttpMethod.GET, "/api/resume/*").permitAll()
                 // AI对话接口：需要登录认证（JWT）
                 .requestMatchers("/api/chat/**").authenticated()
                 .requestMatchers("/api/project/upload").authenticated()
                 .requestMatchers("/api/project/download/**").authenticated()
                 .requestMatchers("/api/project/preview/**").permitAll()
+                // 用户权限管理：仅 admin 可搜索用户并开关权限
+                .requestMatchers("/api/admin/users/**").hasRole("admin")
+                // 测试工具：所有登录用户默认可用（TestController 内部再校验 test_tool 权限）
+                .requestMatchers("/api/test/**").authenticated()
                 .requestMatchers("/api/system/config/**").hasRole("admin")
                 .anyRequest().authenticated()
             )

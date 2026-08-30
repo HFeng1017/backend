@@ -8,8 +8,9 @@ server:
     # SSE长连接支持：禁用连接超时
     connection-timeout: -1
     # 最大线程数，支持SSE长连接（每个连接占用一个线程）
+    # 生产环境控制在120：200线程×1MB栈会加剧小内存服务器内存耗尽导致整机卡死
     threads:
-      max: 200
+      max: 120
     # keep-alive超时
     max-keep-alive-requests: 1000
 
@@ -52,7 +53,14 @@ mybatis-plus:
   type-aliases-package: com.resume.platform.entity
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 生产环境走 slf4j 并默认关闭 SQL 输出（stdout 全量打印 SQL 会造成 IO 压力导致卡顿）
+    # 本地开发需要看 SQL 时，临时改回 org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 日志级别：关闭 mapper 的 SQL debug 输出
+logging:
+  level:
+    com.resume.platform.mapper: warn
 
 file:
   upload-dir: uploads
