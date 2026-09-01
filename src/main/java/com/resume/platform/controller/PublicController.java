@@ -1,6 +1,7 @@
 package com.resume.platform.controller;
 
 import com.resume.platform.common.Result;
+import com.resume.platform.dto.ResumeSearchVO;
 import com.resume.platform.entity.Resume;
 import com.resume.platform.entity.User;
 import com.resume.platform.service.ResumeService;
@@ -12,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -85,11 +87,32 @@ public class PublicController {
         return Result.success(resume);
     }
 
+    /**
+     * 简历搜索（游客可访问）
+     *
+     * 支持两种场景：
+     * 1. 精准搜索：输入简历姓名，全等匹配命中排最前（得分100）
+     * 2. 模糊搜索：输入"Java工程师"、"全栈工程师"等关键词，
+     *    FULLTEXT ngram 分词召回职位/技能/简介匹配的简历，按相关性降序
+     *
+     * @param keyword 关键词（姓名或职位/技能）
+     * @param page    页码，默认1
+     * @param size    每页条数，默认10，上限20
+     * @return 搜索结果（含相关性得分与命中字段）
+     */
     @GetMapping("/search")
-    public Result<Map<String, Object>> search(@RequestParam String keyword) {
-        Map<String, Object> data = new HashMap<>(4);
-        data.put("keyword", keyword);
-        data.put("results", new Object[0]);
+    public Result<Map<String, Object>> search(@RequestParam String keyword,
+                                              @RequestParam(defaultValue = "1") int page,
+                                              @RequestParam(defaultValue = "10") int size) {
+        List<ResumeSearchVO> results = resumeService.searchResumes(keyword, page, size);
+        long total = resumeService.countSearchResults(keyword);
+
+        Map<String, Object> data = new HashMap<>(8);
+        data.put("keyword", keyword == null ? "" : keyword.trim());
+        data.put("page", Math.max(page, 1));
+        data.put("size", size);
+        data.put("total", total);
+        data.put("results", results);
         return Result.success(data);
     }
 

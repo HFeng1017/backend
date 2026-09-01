@@ -132,16 +132,40 @@ public class ProjectController {
         }
         try {
             File uploadPath = new File(uploadDir);
-            if (!uploadPath.exists() && !uploadPath.mkdirs()) {
-                log.error("创建上传目录失败: path={}", uploadPath.getAbsolutePath());
-                throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED);
+            // 优先转成绝对路径，避免相对路径写入启动目录（宝塔下通常无写权限）
+            if (!uploadPath.isAbsolute()) {
+                File absolute = new File(System.getProperty("user.dir"), uploadDir);
+                log.warn("上传目录配置为相对路径: {}, 已转为绝对路径: {}", uploadPath, absolute.getAbsolutePath());
+                uploadPath = absolute;
+            }
+            if (!uploadPath.exists()) {
+                boolean mkdirOk = uploadPath.mkdirs();
+                if (!mkdirOk) {
+                    log.error("创建上传目录失败: path={}, exists={}, canWrite={}, parentWritable={}",
+                            uploadPath.getAbsolutePath(),
+                            uploadPath.exists(),
+                            uploadPath.canWrite(),
+                            uploadPath.getParentFile() == null ? "n/a" : uploadPath.getParentFile().canWrite());
+                    throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED,
+                            "上传目录创建失败，请联系管理员配置 file.upload-dir 为绝对路径");
+                }
+                log.info("上传目录已自动创建: {}", uploadPath.getAbsolutePath());
+            }
+            if (!uploadPath.canWrite()) {
+                log.error("上传目录无写权限: path={}, canWrite={}", uploadPath.getAbsolutePath(), uploadPath.canWrite());
+                throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED, "上传目录无写权限");
             }
             String originalFilename = file.getOriginalFilename();
             String extension = getFileExtension(originalFilename);
             String newFilename = UUID.randomUUID().toString() + (extension.isEmpty() ? "" : "." + extension);
 
             Path filePath = Paths.get(uploadPath.getAbsolutePath(), newFilename);
-            Files.copy(file.getInputStream(), filePath);
+            long bytesCopied = Files.copy(file.getInputStream(), filePath);
+            if (bytesCopied <= 0) {
+                log.error("文件写入字节数为0: path={}", filePath);
+                try { Files.deleteIfExists(filePath); } catch (IOException ignored) {}
+                throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED, "文件内容未写入");
+            }
 
             String fileUrl = "/uploads/" + newFilename;
             String fileType = determineFileType(extension);
@@ -155,12 +179,20 @@ public class ProjectController {
             project.setFileType(fileType);
             project.setFileSize(fileSize);
             project.setStatus(STATUS_NORMAL);
+            log.info("文件写入磁盘成功，准备写DB: filePath={}, fileName={}, size={}, userId={}",
+                    filePath, newFilename, fileSize, userId);
             Project created = projectService.createProject(project);
             log.info("文件上传成功: projectId={}, fileUrl={}", created.getId(), fileUrl);
             return Result.success(created);
         } catch (IOException e) {
-            log.error("文件上传IO异常: ", e);
-            throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED);
+            log.error("文件上传IO异常: uploadDir={}, reason={}", uploadDir, e.toString(), e);
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED, "IO异常: " + e.getMessage());
+        } catch (Exception e) {
+            // 兜底：写DB、越权校验等其他链路的异常，防止裸 50007 无法排查
+            log.error("文件上传异常(非IO): uploadDir={}, type={}, reason={}",
+                    uploadDir, e.getClass().getSimpleName(), e.toString(), e);
+            String hint = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED, "上传失败: " + hint);
         }
     }
 

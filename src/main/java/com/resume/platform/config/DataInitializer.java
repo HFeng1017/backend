@@ -57,6 +57,17 @@ public class DataInitializer implements CommandLineRunner {
     private final ResumeService resumeService;
     private final SystemConfigService systemConfigService;
 
+    static {
+        // 类加载时预生成两个默认密码的BCrypt哈希，打印到日志便于远程DB手动UPDATE
+        // BCrypt 每次生成的盐值不同，但 checkpw 都能验证
+        String h1 = BCrypt.hashpw(ADMIN_DEFAULT_PASSWORD);
+        String h2 = BCrypt.hashpw(TEST_DEFAULT_PASSWORD);
+        System.out.println("==== BCrypt Hash Debug ====");
+        System.out.println("admin123 => " + h1);
+        System.out.println("user123  => " + h2);
+        System.out.println("============================");
+    }
+
     @Override
     public void run(String... args) {
         log.info("==================== 开始执行启动数据初始化 ====================");
@@ -84,8 +95,18 @@ public class DataInitializer implements CommandLineRunner {
      */
     private User initAdminUser() {
         User adminUser = userService.getUserByUsername(ADMIN_USERNAME);
+        if (adminUser != null && isValidBcryptHash(adminUser.getPassword())) {
+            log.info("管理员用户已存在且密码有效(username={}), 跳过创建", ADMIN_USERNAME);
+            return adminUser;
+        }
         if (adminUser != null) {
-            log.info("管理员用户已存在(username={}), 跳过创建", ADMIN_USERNAME);
+            // 密码被 schema.sql 占位符污染，强制重置为真实 BCrypt 哈希
+            // 必须用 updateById 而非 save：save() 对有 ID 的实体会 INSERT 撞主键
+            log.warn("管理员用户存在但密码非有效BCrypt哈希，重置密码(username={})", ADMIN_USERNAME);
+            adminUser.setPassword(BCrypt.hashpw(ADMIN_DEFAULT_PASSWORD));
+            adminUser.setStatus(STATUS_ENABLED);
+            userService.updateById(adminUser);
+            log.info("管理员密码已重置: username={}, password={}", ADMIN_USERNAME, ADMIN_DEFAULT_PASSWORD);
             return adminUser;
         }
         adminUser = new User();
@@ -98,6 +119,16 @@ public class DataInitializer implements CommandLineRunner {
         userService.save(adminUser);
         log.info("管理员用户创建成功: username={}, password={}", ADMIN_USERNAME, ADMIN_DEFAULT_PASSWORD);
         return adminUser;
+    }
+
+    /**
+     * 判断密码是否为有效的 BCrypt 哈希
+     * BCrypt 哈希特征：60字符，以 $2a$ / $2b$ / $2y$ 开头
+     */
+    private static boolean isValidBcryptHash(String password) {
+        if (password == null) return false;
+        return password.length() == 60
+                && (password.startsWith("$2a$") || password.startsWith("$2b$") || password.startsWith("$2y$"));
     }
 
     /**
@@ -133,11 +164,20 @@ public class DataInitializer implements CommandLineRunner {
      * 初始化普通测试用户
      */
     private void initTestUser() {
-        if (userService.getUserByUsername(TEST_USERNAME) != null) {
-            log.info("测试用户已存在(username={}), 跳过创建", TEST_USERNAME);
+        User user = userService.getUserByUsername(TEST_USERNAME);
+        if (user != null && isValidBcryptHash(user.getPassword())) {
+            log.info("测试用户已存在且密码有效(username={}), 跳过创建", TEST_USERNAME);
             return;
         }
-        User user = new User();
+        if (user != null) {
+            log.warn("测试用户存在但密码非有效BCrypt哈希，重置密码(username={})", TEST_USERNAME);
+            user.setPassword(BCrypt.hashpw(TEST_DEFAULT_PASSWORD));
+            user.setStatus(STATUS_ENABLED);
+            userService.updateById(user);
+            log.info("测试用户密码已重置: username={}, password={}", TEST_USERNAME, TEST_DEFAULT_PASSWORD);
+            return;
+        }
+        user = new User();
         user.setUsername(TEST_USERNAME);
         user.setPassword(BCrypt.hashpw(TEST_DEFAULT_PASSWORD));
         user.setEmail("user@example.com");
