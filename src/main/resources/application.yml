@@ -26,9 +26,9 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/resume_platform?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username:
-    password:
+    url: jdbc:mysql://localhost:3306/resume-platform?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: resume-platform
+    password: hlf1017
 
   data:
     redis:
@@ -74,7 +74,7 @@ jwt:
 ai:
   zhipu:
     # API密钥（格式：id.secret）
-    api-key:
+    api-key: 28775ee9f1354bb0ae574b210222f6d1.ip1ykWbAPTT9puPn
     # 智谱AI v4接口地址
     base-url: https://open.bigmodel.cn
     # 默认模型
